@@ -1,8 +1,4 @@
-"""Prototype A — Simple person registry with PostgreSQL.
-
-A basic Flask app with a form to register people.
-Demonstrates a real app that the devops-agents platform deploys.
-"""
+"""Prototype A — Simple person registry with PostgreSQL."""
 import os
 import logging
 
@@ -17,12 +13,10 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 
 def get_db():
-    """Get database connection."""
     return psycopg2.connect(DATABASE_URL)
 
 
 def init_db():
-    """Create tables if they don't exist."""
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -38,9 +32,14 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-        logger.info("Database initialized successfully")
+        logger.info("Database initialized")
     except Exception as e:
         logger.error(f"Database init failed: {e}")
+
+
+# Initialize DB at import time (gunicorn doesn't run __main__)
+if DATABASE_URL:
+    init_db()
 
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -48,24 +47,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <title>Prototype A - Registro de Personas</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
-        h1 { color: #2c3e50; }
-        form { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
-        input { padding: 8px 12px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; }
-        button { padding: 8px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #2980b9; }
-        table { width: 100%%; border-collapse: collapse; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background: #3498db; color: white; }
-        tr:hover { background: #f5f5f5; }
-        .badge { background: #27ae60; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px; }
-        .info { color: #7f8c8d; font-size: 14px; }
+        body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }}
+        h1 {{ color: #2c3e50; }}
+        form {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }}
+        input {{ padding: 8px 12px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; }}
+        button {{ padding: 8px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }}
+        button:hover {{ background: #2980b9; }}
+        table {{ width: 100%%; border-collapse: collapse; }}
+        th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }}
+        th {{ background: #3498db; color: white; }}
+        tr:hover {{ background: #f5f5f5; }}
+        .badge {{ background: #27ae60; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px; }}
+        .info {{ color: #7f8c8d; font-size: 14px; }}
     </style>
 </head>
 <body>
     <h1>Prototype A <span class="badge">TEST</span></h1>
     <p class="info">Deployed by devops-agents platform | PostgreSQL backend</p>
-
     <form method="POST" action="/persons">
         <h3>Registrar Persona</h3>
         <input name="name" placeholder="Nombre completo" required>
@@ -73,7 +71,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <input name="age" placeholder="Edad" type="number" min="0" max="150">
         <button type="submit">Guardar</button>
     </form>
-
     <h2>Personas registradas ({count})</h2>
     <table>
         <tr><th>ID</th><th>Nombre</th><th>Email</th><th>Edad</th><th>Registrado</th></tr>
@@ -85,7 +82,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 @app.route("/")
 def index():
-    """Show person form and list."""
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -93,7 +89,6 @@ def index():
         persons = cur.fetchall()
         cur.close()
         conn.close()
-
         rows = "".join(
             f"<tr><td>{p[0]}</td><td>{p[1]}</td><td>{p[2] or '-'}</td>"
             f"<td>{p[3] or '-'}</td><td>{p[4].strftime('%Y-%m-%d %H:%M') if p[4] else '-'}</td></tr>"
@@ -101,30 +96,26 @@ def index():
         )
         return HTML_TEMPLATE.format(rows=rows, count=len(persons))
     except Exception as e:
-        return f"<h1>Database Error</h1><p>{e}</p><p>DATABASE_URL configured: {'yes' if DATABASE_URL else 'no'}</p>", 500
+        return f"<h1>Error</h1><p>{e}</p>", 500
 
 
 @app.route("/persons", methods=["POST"])
 def add_person():
-    """Add a new person."""
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip() or None
     age = request.form.get("age", "").strip()
     age = int(age) if age else None
-
     conn = get_db()
     cur = conn.cursor()
     cur.execute("INSERT INTO persons (name, email, age) VALUES (%s, %s, %s)", (name, email, age))
     conn.commit()
     cur.close()
     conn.close()
-
     return redirect("/")
 
 
 @app.route("/api/persons")
 def api_persons():
-    """JSON API for persons list."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT id, name, email, age FROM persons ORDER BY id DESC")
@@ -136,7 +127,6 @@ def api_persons():
 
 @app.route("/health")
 def health():
-    """Health check with database connectivity."""
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -146,9 +136,3 @@ def health():
         return jsonify({"status": "healthy", "database": "connected"})
     except Exception as e:
         return jsonify({"status": "unhealthy", "error": str(e)}), 500
-
-
-if __name__ == "__main__":
-    init_db()
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port, debug=False)
