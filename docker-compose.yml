@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DATABASE_URL=postgresql://user:pass@db:5432/prototype_a
+      - REDIS_URL=redis://redis:6379/0
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=prototype_a
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+
+  redis:
+    image: redis:7
